@@ -1,0 +1,10 @@
+{
+  "smile_dental": {
+    "url": "file://./example_data/smile_dental.html",
+    "parser": "generic"
+  },
+  "happy_teeth": {
+    "url": "file://./example_data/happy_teeth.json",
+    "parser": "json"
+  }
+}
