@@ -1,34 +1,58 @@
 name: Nightly NHS Scrape
 
 on:
+  workflow_dispatch:
   schedule:
-    # Runs every day at 8 PM UK time (convert to 20:00 UTC in winter, 19:00 UTC in summer)
+    # Runs 20:00 UTC daily. (Oct–Mar this equals 20:00 UK; Apr–Oct it runs at 21:00 UK due to BST.)
     - cron: "0 20 * * *"
-  workflow_dispatch:  # allows manual run
+
+permissions:
+  contents: write   # ✅ allow git push from actions
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    concurrency:
+      group: nightly-scrape
+      cancel-in-progress: false
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true    # uses GITHUB_TOKEN for push
 
-      - name: Set up Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Run nightly scrape
-        run: npm run scrape
-
-      - name: Commit and push updated data
+      - name: Install deps
         run: |
-          git config --global user.email "github-actions@users.noreply.github.com"
-          git config --global user.name "SmileMap Bot"
-          git add .
-          git commit -m "data: nightly NHS sync [$(date -u)]" || echo "No changes to commit"
-          git push
+          npm ci || npm install --legacy-peer-deps
+
+      - name: Run scrape
+        run: |
+          npm run scrape
+
+      - name: Commit data changes (if any)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Make sure we’re up-to-date to avoid non fast-forward issues
+          git pull --rebase origin main || true
+
+          # Stage likely-changed files
+          git add outputs/*.csv .cache/geocode-cache.json || true
+          git add outputs/*.json || true
+
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(data): nightly scrape ($(date -u +'%Y-%m-%d %H:%M:%S UTC'))"
+            git push origin HEAD:main
+          else
+            echo "No data changes to commit."
+          fi
