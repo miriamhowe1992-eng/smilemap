@@ -37,7 +37,7 @@ jobs:
         run: |
           npm run scrape
 
-      - name: Commit data changes (if any)
+      - name: Commit and push updated data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -48,6 +48,7 @@ jobs:
           # Stage likely-changed files
           git add outputs/*.csv .cache/geocode-cache.json || true
           git add outputs/*.json || true
+          git add outputs/*.md || true   # ← include markdown summaries too
 
           # Only commit if there are changes
           if ! git diff --cached --quiet; then
