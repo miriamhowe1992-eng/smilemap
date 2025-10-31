@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* ---------- SmileMap design tokens ---------- */
+:root {
+  --smile-blue: #003366;        /* deep trust blue */
+  --smile-turquoise: #11b5d8;   /* accent */
+  --smile-light: #f5fbfd;       /* app background */
+  --smile-navy: #002b45;        /* default text */
+  --smile-grey: #e6eef2;        /* borders */
+}
+
+/* ---------- Global base ---------- */
+html, body {
+  @apply min-h-full;
+  background: var(--smile-light);
+  color: var(--smile-navy);
+}
+
+h1, h2, h3 { color: var(--smile-blue); }
+
+a { @apply transition-colors; }
+a:hover { color: var(--smile-blue); }
+
+/* ---------- Reusable utilities (STANDARD Tailwind classes only) ---------- */
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition shadow-sm;
+}
+.btn-primary {
+  background: var(--smile-turquoise);
+  color: white;
+}
+.btn-primary:hover { background: var(--smile-blue); }
+.btn-outline {
+  @apply border rounded-xl px-4 py-2 text-sm font-medium;
+  border-color: var(--smile-turquoise);
+  color: var(--smile-turquoise);
+}
+.btn-outline:hover {
+  background: var(--smile-turquoise);
+  color: white;
+}
+
+/* Cards */
+.card {
+  @apply rounded-2xl border bg-white p-5 shadow-sm;
+  border-color: var(--smile-grey);
+}
+.card-hover:hover { @apply shadow-md; }
+
+/* Chips (filter pills) */
+.chip {
+  @apply rounded-full border px-3 py-1.5 text-sm shadow-sm;
+  border-color: var(--smile-grey);
+}
+.chip-active {
+  background: var(--smile-turquoise);
+  color: white;
+  border-color: transparent;
+}
+
+/* Header + footer shells */
+.header {
+  @apply sticky top-0 z-20 border-b bg-white/80 backdrop-blur-md shadow-sm;
+  border-color: var(--smile-grey);
+}
+.footer {
+  background: var(--smile-blue);
+  color: white;
+}

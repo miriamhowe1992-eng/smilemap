@@ -1,0 +1,45 @@
+// lib/format.ts
+// Utilities to make scraped NHS text presentable.
+
+export const UK_POSTCODE_RE =
+  /\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*?(\d[A-Z]{2})\b/i;
+
+export function cleanAddress(raw: string): string {
+  if (!raw) return "Address unavailable";
+
+  // Normalise whitespace
+  let s = String(raw)
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Strip common NHS boilerplate fragments
+  const BOILERPLATE = [
+    /(?:services?\s*)?find a dentist.*?go back\s*/i,
+    /home browse more home.*$/i,
+    /support links.*$/i,
+    /contact details? and opening times.*$/i,
+    /appointments.*$/i,
+    /facilities.*$/i,
+    /nhs (website|services).*$/i,
+    /view your (gp|test) .*$/i,
+  ];
+  for (const pat of BOILERPLATE) s = s.replace(pat, "");
+
+  // If we can see a UK postcode, trim to "... <POSTCODE>"
+  const m = s.match(UK_POSTCODE_RE);
+  if (m) {
+    const end = m.index! + m[0].length;
+    s = s.slice(0, end);
+  }
+
+  // Remove any leading filler that might still remain
+  s = s
+    .replace(/^(go back|search .*? website)\s*/i, "")
+    .replace(/^\W+/, "")
+    .trim();
+
+  // Collapse duplicate commas/spaces
+  s = s.replace(/\s*,\s*/g, ", ").replace(/\s{2,}/g, " ").trim();
+
+  return s || "Address unavailable";
+}
