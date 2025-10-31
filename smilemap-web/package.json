@@ -1,0 +1,38 @@
+{
+  "name": "smilemap-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "urls:build": "tsx scripts/build-url-list.ts",
+    "data:normalize": "tsx scripts/normalize-practices.ts",
+    "scrape:nhs": "tsx scripts/scrape-nhs.ts",
+    "enrich:nhs": "tsx scripts/enrich-from-nhs.ts"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.548.0",
+    "next": "16.0.0",
+    "p-limit": "^7.2.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-leaflet": "^5.0.0",
+    "undici": "^7.16.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
+  }
+}

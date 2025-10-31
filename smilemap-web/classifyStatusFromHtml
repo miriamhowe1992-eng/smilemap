@@ -1,0 +1,75 @@
+function classifyStatusFromHtml(html: string): {
+  code: "GREEN" | "AMBER" | "RED" | "UNKNOWN";
+  note: string;
+} {
+  // Normalize the page text
+  let t = html.replace(/\s+/g, " ").toLowerCase();
+
+  // Strip some boilerplate copy that appears on many NHS pages
+  const boilerplate = [
+    /find out if this dentist accepts new nhs patients/g,
+    /and get advice on appointments for routine, urgent or emergency dental care/g,
+    /report an issue with information on this nhs profile/g,
+    /about this dentist/g,
+    /search the nhs website/g,
+  ];
+  boilerplate.forEach((re) => (t = t.replace(re, "")));
+
+  const has = (re: RegExp) => re.test(t);
+
+  // Helper: check if a positive phrase is negated nearby (e.g., "not accepting")
+  const nearNot = (re: RegExp) => {
+    const m = t.match(re);
+    if (!m) return false;
+    const idx = t.indexOf(m[0]);
+    const windowText = t.slice(Math.max(0, idx - 40), Math.min(t.length, idx + m[0].length + 40));
+    return /\bnot\b|\bno longer\b/.test(windowText);
+  };
+
+  // ---------- RED (highest priority) ----------
+  if (
+    has(/\bnot\s+accept(?:ing|s)\s+(new\s+)?nhs\s+patients\b/) ||
+    has(/\bno\s+(longer\s+)?nhs\b/) ||
+    has(/\bclosed\s+to\s+nhs\b/) ||
+    has(/\bprivate\s+only\b/) ||
+    has(/\breferral\s+only\b/) ||
+    has(/\bnhs\s+patients\s+not\s+accepted\b/) ||
+    has(/\bno\s+longer\s+accept(?:ing|s)\b/)
+  ) {
+    return { code: "RED", note: "Not accepting new NHS patients" };
+  }
+
+  // ---------- AMBER ----------
+  if (
+    has(/\blimited\s+nhs\s+availability\b/) ||
+    has(/\bwaiting\s*list\b/) ||
+    has(/\bchildren\s+only\b/) ||
+    has(/\bemergency\s+only\b/) ||
+    has(/\baccepting\s+children\b/)
+  ) {
+    return { code: "AMBER", note: "Limited NHS availability / waiting list" };
+  }
+
+  // ---------- GREEN ----------
+  const greenPhrases: RegExp[] = [
+    /\baccept(?:ing|s)\s+(new\s+)?nhs\s+(patients|adults|children)\b/,
+    /\btaking\s+on\s+(new\s+)?nhs\b/,
+    /\bnew\s+nhs\s+patients\s+welcome\b/,
+    /\bcurrently\s+taking\s+on\s+nhs\s+patients\b/,
+  ];
+  for (const re of greenPhrases) {
+    if (has(re) && !nearNot(re)) {
+      return { code: "GREEN", note: "Accepting new NHS patients" };
+    }
+  }
+
+  // ---------- UNKNOWN ----------
+  if (has(/\bnhs\b/)) {
+    return {
+      code: "UNKNOWN",
+      note: "Provides NHS care but availability unclear",
+    };
+  }
+
+  return { code: "UNKNOWN", note: "NHS availability not stated" };
+}

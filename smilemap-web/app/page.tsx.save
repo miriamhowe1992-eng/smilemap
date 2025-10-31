@@ -1,0 +1,353 @@
+// app/page.tsx
+"use client";
+
+import * as React from "react";
+import Image from "next/image";
+import Link from "next/link";
+
+import type { CleanPractice } from "@/lib/types";
+import clean from "@/data/practices.clean.json";
+
+import { PracticeCard, type Practice } from "@/components/PracticeCard";
+import type { NHSStatus } from "@/components/StatusBadge";
+
+/* -------------------------------------------
+   Helpers: robust field pickers & normalizers
+-------------------------------------------- */
+
+function firstStr(...vals: Array<unknown>): string | undefined {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
+function buildAddress(p: any): string {
+  const line1 =
+    firstStr(
+      p.address,
+      p.address1,
+      p.addr1,
+      p.street,
+      p.streetAddress,
+      p.addressLine1,
+      p["address-line-1"]
+    ) ?? "";
+
+  const line2 =
+    firstStr(p.address2, p.addr2, p.addressLine2, p["address-line-2"], p.district) ??
+    "";
+
+  const town = firstStr(p.town, p.city, p.locality, p.postTown) ?? "";
+  const pc = firstStr(p.postcode, p.postCode, p.post_code) ?? "";
+
+  return [line1, line2, town, pc].filter(Boolean).join(", ");
+}
+
+type NormalizedStatus = {
+  code: "GREEN" | "AMBER" | "RED" | "UNKNOWN";
+  note?: string;
+};
+function normalizeStatus(p: any): NormalizedStatus {
+  const raw =
+    firstStr(
+      p.status,
+      p.statusNote,
+      p.nhsStatus,
+      p.nhsStatusText,
+      p.accepting,
+      p.acceptingText,
+      p.bannerText,
+      p.headline,
+      p.rawStatus,
+      p.summary
+    )?.toLowerCase() ?? "";
+
+  const acceptingBool =
+    typeof p.acceptingNewPatients === "boolean" ? p.acceptingNewPatients : undefined;
+
+  if (acceptingBool === true)
+    return { code: "GREEN", note: "Accepting new NHS patients." };
+  if (acceptingBool === false)
+    return { code: "RED", note: "Not accepting new NHS patients (private only)." };
+
+  if (/\baccepting\b|\bnew nhs\b|\bcurrently taking\b/.test(raw))
+    return { code: "GREEN", note: "Accepting new NHS patients." };
+
+  if (/\blimited\b|\bwaiting list\b|\bchildren only\b/.test(raw))
+    return { code: "AMBER", note: "Limited NHS availability / waiting list." };
+
+  if (/\bnot accepting\b|\bclosed to nhs\b|\bprivate only\b|\bno nhs\b/.test(raw))
+    return { code: "RED", note: "Not accepting new NHS patients (private only)." };
+
+  if (/\bgreen\b/.test(raw)) return { code: "GREEN", note: "Accepting new NHS patients." };
+  if (/\bamber\b/.test(raw)) return { code: "AMBER", note: "Limited NHS availability / waiting list." };
+  if (/\bred\b/.test(raw)) return { code: "RED", note: "Not accepting new NHS patients (private only)." };
+
+  return { code: "UNKNOWN", note: "NHS availability not stated" };
+}
+
+function toPractice(p: any): Practice {
+  const id =
+    firstStr(p.id, p.slug, p.nhsId) ??
+    `${(p.name || "practice").toLowerCase()}-${firstStr(
+      p.postcode,
+      p.postCode,
+      p.post_code
+    ) ?? "na"}`;
+
+  const name =
+    firstStr(p.name, p.practiceName, p.title, p.heading) ?? "Unknown practice";
+
+  const address = buildAddress(p);
+
+  const phone = firstStr(p.phone, p.telephone, p.tel, p.contactNumber) ?? "";
+  const email = firstStr(p.email, p.contactEmail) ?? null;
+
+  const link = firstStr(p.nhsUrl, p.url, p.profileUrl, p.href) ?? "#";
+
+  const status = normalizeStatus(p);
+
+  const accessibility = Array.isArray(p.accessibility)
+    ? p.accessibility
+    : [firstStr(p.access, p.accessibilityText) ?? "Not specified"];
+
+  // PracticeCard expects GREEN/AMBER/RED. When unknown, we’ll default to AMBER so the UI
+  // remains neutral but include a clarifying note.
+  const code =
+    status.code === "UNKNOWN" ? ("AMBER" as const) : (status.code as "GREEN" | "AMBER" | "RED");
+
+  return {
+    id,
+    name,
+    address,
+    phone,
+    email,
+    status: code,
+    statusNote: status.note,
+    accessibility,
+    nhsLink: link,
+    isSponsored: false,
+  };
+}
+
+/* -------------------------------------------
+   Page component
+-------------------------------------------- */
+
+export default function HomePage() {
+  const [q, setQ] = React.useState("");
+  const [status, setStatus] = React.useState<NHSStatus>("ANY");
+  const [items, setItems] = React.useState<Practice[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  // Load and normalize once
+  React.useEffect(() => {
+    const src = (clean as CleanPractice[]).filter(Boolean);
+    setItems(src.map(toPractice));
+    setLoading(false);
+  }, []);
+
+  // Filters
+  const filtered = React.useMemo(() => {
+    const qnorm = q.trim().toLowerCase();
+    return items.filter((p) => {
+      const statusOk = status === "ANY" || p.status === status;
+      const hay = `${p.name ?? ""} ${p.address ?? ""}`.toLowerCase();
+      const qOk = !qnorm || hay.includes(qnorm);
+      return statusOk && qOk;
+    });
+  }, [items, q, status]);
+
+  return (
+    <div className="min-h-screen bg-[#f7f9fc]">
+      {/* NAVBAR */}
+      <header
+        className="sticky top-0 z-30 w-full border-b bg-white/90 backdrop-blur"
+        style={{ borderColor: "#e5e9f2" }}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo-smilemap.png" alt="SmileMap" width={190} height={50} priority />
+          </Link>
+          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
+            <Link href="/">Home</Link>
+            <Link href="/find">Find a Dentist</Link>
+            <Link href="/plans">Plans &amp; Pricing</Link>
+            <Link href="/contact">Contact</Link>
+          </nav>
+          <Link
+            href="/prohub"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700"
+          >
+            SmileMap ProHub
+          </Link>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section
+        className="border-b"
+        style={{
+          borderColor: "#e5e9f2",
+          background:
+            "radial-gradient(1200px 600px at -10% -20%, rgba(31,111,255,.06), transparent)",
+        }}
+      >
+        <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 md:grid-cols-2">
+          <div>
+            <h1
+              className="text-3xl font-extrabold leading-tight md:text-5xl"
+              style={{ color: "#133b5c" }}
+            >
+              Search Local Dentists Across the UK
+            </h1>
+            <p className="mt-4 max-w-[48ch] text-base text-slate-600">
+              Find an NHS or private dentist near you in seconds.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="#finder"
+                className="rounded-xl bg-[#1f6fff] px-5 py-3 text-center text-sm font-semibold text-white"
+              >
+                Find a Dentist
+              </a>
+              <a
+                href="/pro"
+                className="rounded-xl px-5 py-3 text-center text-sm font-semibold"
+                style={{ color: "#133b5c", border: "1px solid #e5e9f2" }}
+              >
+                For Dentists
+              </a>
+            </div>
+          </div>
+
+          <div
+            className="relative mx-auto h-60 w-full max-w-md overflow-hidden rounded-2xl ring-1"
+            style={{
+              ringColor: "#e5e9f2",
+              background:
+                "linear-gradient(135deg, rgba(19,59,92,.06), rgba(43,190,203,.06))",
+            }}
+          >
+            <div className="absolute inset-0 grid place-items-center">
+              <span
+                className="inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm"
+                style={{ borderColor: "#e5e9f2" }}
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+                <span className="font-semibold text-slate-800">NHS: Green</span>
+                <span className="hidden text-xs text-slate-600 sm:inline">
+                  · Accepting new patients
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FINDER */}
+      <section id="finder" className="mx-auto max-w-6xl px-4 py-8">
+        <div className="rounded-2xl bg-white p-4 ring-1" style={{ ringColor: "#e5e9f2" }}>
+          {/* Search + Status */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search by town, practice name, or postcode (e.g. SW1A 1AA)"
+              className="w-full rounded-xl border px-4 py-3 text-sm outline-none"
+              style={{ borderColor: "#e5e9f2" }}
+              aria-label="Search"
+            />
+            <div className="flex gap-2">
+              {(["ANY", "GREEN", "AMBER", "RED"] as NHSStatus[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatus(s)}
+                  className={`rounded-full border px-4 py-2 text-sm ${
+                    status === s ? "bg-slate-50 font-semibold" : ""
+                  }`}
+                  style={{
+                    borderColor: status === s ? "#2bbecb" : "#e5e9f2",
+                    color: status === s ? "#133b5c" : "#334155",
+                  }}
+                >
+                  {s === "ANY" ? "All" : `NHS: ${s}`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Key */}
+          <div className="mt-3 text-sm font-semibold text-slate-700">NHS Availability Key</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 ring-1">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#11a371" }} />
+              <span className="text-sm font-medium text-slate-800">Green</span>
+              <span className="text-sm text-slate-600">— Accepting new NHS patients.</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 ring-1">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#f59e0b" }} />
+              <span className="text-sm font-medium text-slate-800">Amber</span>
+              <span className="text-sm text-slate-600">
+                — Limited NHS availability / waiting list.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 ring-1">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#ef4444" }} />
+              <span className="text-sm font-medium text-slate-800">Red</span>
+              <span className="text-sm text-slate-600">— Private only / no new NHS patients.</span>
+            </div>
+          </div>
+        </div>
+
+        {/* RESULTS */}
+        <div className="mt-6 grid gap-4">
+          {loading && (
+            <div
+              className="rounded-2xl bg-white p-6 text-center text-slate-600 ring-1"
+              style={{ ringColor: "#e5e9f2" }}
+            >
+              Loading latest results…
+            </div>
+          )}
+
+          {!loading &&
+            filtered.map((p, i) => (
+              <PracticeCard key={`${p.id}-${i}`} p={p} /> // avoid duplicate key warnings
+            ))}
+
+          {!loading && filtered.length === 0 && (
+            <div
+              className="rounded-2xl bg-white p-8 text-center text-slate-600 ring-1"
+              style={{ ringColor: "#e5e9f2" }}
+            >
+              No practices match your filters yet. Try a nearby postcode.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="mt-16 border-t bg-white/60">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 md:flex-row">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Image src="/smilemap-pin.png" alt="" width={20} height={20} />
+            <span>© {new Date().getFullYear()} SmileMap</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-slate-600">
+            <a href="/privacy" className="hover:text-slate-900">
+              Privacy
+            </a>
+            <a href="/terms" className="hover:text-slate-900">
+              Terms
+            </a>
+            <a href="/contact" className="hover:text-slate-900">
+              Contact
+            </a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
