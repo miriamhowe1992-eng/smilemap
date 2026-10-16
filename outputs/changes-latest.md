@@ -1,5 +1,5 @@
-# Nightly NHS changes (2026-10-15T22:54:17.903Z)
-Last run (UK time): 15/10/2026, 23:54:17
+# Nightly NHS changes (2026-10-16T22:33:13.441Z)
+Last run (UK time): 16/10/2026, 23:33:13
 
 **New practices:** 0
 **Removed practices:** 0
